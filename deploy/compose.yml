@@ -1,4 +1,6 @@
 # Deliberate migration runner. PostgreSQL and auth_app are owned by infra.
+# ENV (dev | qa | main) is also the Liquibase context: changesets with contextFilter
+# "dev,qa" (seed users) are skipped in main; changesets without one always run.
 services:
   auth-db-migrate:
     image: liquibase/liquibase:4.29
@@ -17,6 +19,7 @@ services:
       - --password=${PG_ADMIN_PASSWORD:?set PG_ADMIN_PASSWORD}
       - --database-changelog-table-name=databasechangelog_auth
       - --database-changelog-lock-table-name=databasechangeloglock_auth
+      - "--contexts=${ENV:?set ENV}"         # seed users run only in dev and qa (D-20)
     command: [update]
     networks: [platform]
 
