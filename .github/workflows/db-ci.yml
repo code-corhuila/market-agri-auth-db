@@ -1,0 +1,94 @@
+name: Database rebuild
+
+on:
+  pull_request:
+    branches: [develop, qa, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PG_DATABASE: market_agri
+  PG_ADMIN_USER: market_admin
+  PG_ADMIN_PASSWORD: ci-only
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: market_agri
+          POSTGRES_USER: market_admin
+          POSTGRES_PASSWORD: ci-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U market_admin -d market_agri"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare the instance as market-agri-infra would
+        run: |
+          psql() {
+            docker run --rm -i --network host -e PGPASSWORD="$PG_ADMIN_PASSWORD" postgres:16-alpine \
+              psql -v ON_ERROR_STOP=1 -h localhost -U "$PG_ADMIN_USER" -d "$PG_DATABASE" "$@"
+          }
+          psql -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+          psql -c "CREATE ROLE auth_app LOGIN PASSWORD 'ci-only';"
+          psql -c "ALTER ROLE auth_app SET search_path = auth;"
+
+      - name: Apply, verify isolation, roll back, and rebuild
+        run: |
+          lb() {
+            docker run --rm --network host -v "$PWD:/workspace:ro" liquibase/liquibase:4.29 \
+              --search-path=/workspace \
+              --changelog-file=changelog/changelog-master.yaml \
+              --url="jdbc:postgresql://localhost:5432/$PG_DATABASE" \
+              --username="$PG_ADMIN_USER" --password="$PG_ADMIN_PASSWORD" \
+              --database-changelog-table-name=databasechangelog_auth \
+              --database-changelog-lock-table-name=databasechangeloglock_auth "$@"
+          }
+          psql() {
+            docker run --rm -i --network host -e PGPASSWORD="$PG_ADMIN_PASSWORD" postgres:16-alpine \
+              psql -v ON_ERROR_STOP=1 -h localhost -U "$PG_ADMIN_USER" -d "$PG_DATABASE" "$@"
+          }
+
+          echo "::group::1. update from empty"
+          lb update
+          echo "::endgroup::"
+
+          echo "::group::2. second update must apply nothing"
+          lb update | tee second.txt
+          grep -q "Run:  *0" second.txt || { echo "second update applied changes: not incremental"; exit 1; }
+          echo "::endgroup::"
+
+          echo "::group::3. J.10: auth_app writes only in auth"
+          psql -c "CREATE TABLE auth.__ci_privilege_probe (id integer);" \
+               -c "CREATE TABLE public.__ci_privilege_probe (id integer);"
+          own_schema=$(psql -At -c "SELECT has_table_privilege('auth_app', 'auth.__ci_privilege_probe', 'INSERT');")
+          other_schema=$(psql -At -c "SELECT has_table_privilege('auth_app', 'public.__ci_privilege_probe', 'INSERT');")
+          [ "$own_schema" = "t" ] || { echo "auth_app cannot write in its own schema"; exit 1; }
+          [ "$other_schema" = "f" ] || { echo "auth_app can write outside its own schema"; exit 1; }
+          psql -At -F '|' < .github/workflows/j10-privileges.sql | tee privileges.txt
+          awk -F'|' '$1 == "auth_app" && $2 != "auth" && $4 == "t" {bad=1} END {exit bad}' privileges.txt \
+            || { echo "auth_app can write outside the auth schema"; exit 1; }
+          psql -c "DROP TABLE public.__ci_privilege_probe;" -c "DROP TABLE auth.__ci_privilege_probe;"
+          echo "::endgroup::"
+
+          echo "::group::4. full rollback removes the domain schema and roles"
+          lb rollback-count 999
+          left=$(psql -At -c "SELECT (SELECT count(*) FROM pg_namespace WHERE nspname = 'auth')
+                                   + (SELECT count(*) FROM pg_roles WHERE rolname IN ('auth_reader','auth_writer'));")
+          [ "$left" = "0" ] || { echo "rollback left the auth schema or roles behind"; exit 1; }
+          echo "::endgroup::"
+
+          echo "::group::5. update again after rollback"
+          lb update
+          echo "::endgroup::"
