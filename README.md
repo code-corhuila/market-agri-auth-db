@@ -23,7 +23,8 @@ changelog/changelog-master.yaml   Liquibase entry point
 04_tcl/                           transaction control and recovery scripts
 05_rollbacks/                     rollback SQL mirroring forward changes
 deploy/compose.yml                deliberate Liquibase runner, included by infra
-.github/workflows/db-ci.yml       rebuild, isolation, full rollback, and rebuild
+.github/workflows/db-ci.yml       rebuild, isolation, table rules, full rollback, rebuild, seeds
+tests/                            SQL checks of the table rules and the seeds, run by db-ci
 ```
 
 ## Rules
@@ -37,6 +38,37 @@ deploy/compose.yml                deliberate Liquibase runner, included by infra
    `market-agri-transactions-db`): a state change is an `UPDATE` or a new row. A changeset that needs
    to delete data runs as the migration user, not as `auth_app`.
 5. Keep database deployment separate from API startup. Migrate first, then deploy the API.
+6. Seeds are idempotent (`INSERT … ON CONFLICT … DO UPDATE`). **Seed users run only in dev and
+   qa** (`contextFilter: "dev,qa"`): the runner passes `--contexts=${ENV}`, so `main` starts
+   without users. Their rollback fails on purpose once a seed user has refresh tokens.
+
+## Data dictionary
+
+Spec: `market-agri-docs` `06-data/models.md` (*Service: auth*), the auth-service data model,
+`07-api/api-contract.md` D-C2 (refresh tokens) and D-C35 (idempotent creation).
+
+| Table | Purpose | Main rules |
+|---|---|---|
+| `user_account` | Credentials and the single role | `email` unique, stored lower-cased and trimmed (INV-002); `role` `PRODUCER`/`BUYER`/`ADMIN`, never updated (INV-001); `password_hash` only a bcrypt hash of cost ≥ 12 (INV-003); `name` 1–150; `deleted_at` so ids held by other domains never dangle |
+| `refresh_token` | Renewable sessions (D-C2) | only the SHA-256 of the opaque token (64 hex), unique; `expires_at` after creation; `used_at` / `revoked_at` mark the single use and the revocation; FK `RESTRICT` to the user |
+| `idempotency_key` | The key each registration was created with (E-01, D-C35) | primary key `key_value` (8–128): registration is anonymous, so there is no owner; FK `RESTRICT` to the user |
+
+Not in this schema yet: `farm_profile` (no endpoint in this delivery) and the login lockout state
+of FR-009 (HU-AUTH-005). Expired refresh tokens and old keys are not purged yet (`auth_app` has no
+`DELETE`). The rules are tested in `tests/auth-tables.sql` and the seeds in `tests/seed-users.sql`,
+both run by `db-ci.yml` (step 3b).
+
+## Seed users (dev and qa only)
+
+The same accounts as the simulated mode of `market-agri-front`, plus the second producer of
+catalog's seed products. Development passwords, never used outside dev and qa.
+
+| Name | Email | Password | Role |
+|---|---|---|---|
+| Ana Ruiz | `productor@market-agri.test` | `Productor123` | `PRODUCER` |
+| Luis Gómez | `productor2@market-agri.test` | `Productor123` | `PRODUCER` |
+| Carlos Pérez | `comprador@market-agri.test` | `Comprador123` | `BUYER` |
+| Administración | `admin@market-agri.test` | `Admin123` | `ADMIN` |
 
 ## Run it
 

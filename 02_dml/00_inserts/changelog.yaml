@@ -1,1 +1,19 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - changeSet:
+      id: dml-inserts-001
+      author: contreras-elkin
+      labels: "HU-PLAT-003,dml,inserts"
+      contextFilter: "dev,qa"
+      comment: "user_account - four seed users for dev and qa only (D-20): the runner passes --contexts=ENV, so main starts without users."
+      changes:
+        - sqlFile:
+            path: 001_seed_users.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/02_dml/00_inserts/001_seed_users.rollback.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false

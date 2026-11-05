@@ -1,1 +1,52 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - changeSet:
+      id: ddl-tables-001
+      author: contreras-elkin
+      labels: "HU-PLAT-003,ddl,tables"
+      comment: "user_account - credentials and the single role (06-data/models.md, INV-001..003)."
+      changes:
+        - sqlFile:
+            path: 001_create_user_account.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/001_create_user_account.rollback.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false
+  - changeSet:
+      id: ddl-tables-002
+      author: contreras-elkin
+      labels: "HU-PLAT-003,ddl,tables"
+      comment: "refresh_token - renewable sessions, only the hash of the opaque token (D-C2)."
+      changes:
+        - sqlFile:
+            path: 002_create_refresh_token.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/002_create_refresh_token.rollback.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false
+  - changeSet:
+      id: ddl-tables-003
+      author: contreras-elkin
+      labels: "HU-PLAT-003,ddl,tables"
+      comment: "idempotency_key - the key each registration was created with (E-01, D-C35)."
+      changes:
+        - sqlFile:
+            path: 003_create_idempotency_key.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/003_create_idempotency_key.rollback.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false
