@@ -1,0 +1,7 @@
+-- Permissions stay within the auth schema (Anexo J.3).
+GRANT USAGE ON SCHEMA auth TO auth_reader, auth_writer;
+GRANT SELECT ON ALL TABLES IN SCHEMA auth TO auth_reader;
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA auth TO auth_writer;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT SELECT ON TABLES TO auth_reader;
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT SELECT, INSERT, UPDATE ON TABLES TO auth_writer;
