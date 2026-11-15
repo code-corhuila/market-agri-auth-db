@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: ddl-schemas-001
+      author: contreras-elkin
+      labels: "HU-PLAT-003,ddl,schemas"
+      comment: "Schema of the auth domain. Nothing of this domain lives in public (Anexo A, rule 9)."
+      changes:
+        - sqlFile:
+            path: 001_create_schema_auth.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/01_schemas/001_create_schema_auth.rollback.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false

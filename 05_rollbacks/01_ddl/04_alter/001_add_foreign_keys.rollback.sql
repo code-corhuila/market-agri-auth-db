@@ -1,0 +1,2 @@
+ALTER TABLE auth.idempotency_key DROP CONSTRAINT fk_idempotency_key_user_account;
+ALTER TABLE auth.refresh_token DROP CONSTRAINT fk_refresh_token_user_account;
