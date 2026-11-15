@@ -16,3 +16,20 @@ databaseChangeLog:
             relativeToChangelogFile: true
             splitStatements: false
             stripComments: false
+  - changeSet:
+      id: ddl-alter-002
+      author: contreras-elkin
+      labels: "HU-AUTH-005,ddl,alter"
+      comment: "Lockout state of user_account: failed_login_count and locked_until (FR-009)."
+      changes:
+        - sqlFile:
+            path: 002_add_login_lockout.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/04_alter/002_add_login_lockout.rollback.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false

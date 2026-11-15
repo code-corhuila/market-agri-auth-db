@@ -49,7 +49,7 @@ Spec: `market-agri-docs` `06-data/models.md` (*Service: auth*), the auth-service
 
 | Table | Purpose | Main rules |
 |---|---|---|
-| `user_account` | Credentials and the single role | `email` unique, stored lower-cased and trimmed (INV-002); `role` `PRODUCER`/`BUYER`/`ADMIN`, never updated (INV-001); `password_hash` only a bcrypt hash of cost ≥ 12 (INV-003); `name` 1–150; `deleted_at` so ids held by other domains never dangle |
+| `user_account` | Credentials and the single role | `email` unique, stored lower-cased and trimmed (INV-002); `role` `PRODUCER`/`BUYER`/`ADMIN`, never updated (INV-001); `password_hash` only a bcrypt hash of cost ≥ 12 (INV-003); `name` 1–150; `deleted_at` so ids held by other domains never dangle; lockout state `failed_login_count` (≥ 0, consecutive failed logins) and `locked_until` (set after the 5th, 15 minutes; HU-AUTH-005, FR-009) |
 | `refresh_token` | Renewable sessions (D-C2) | only the SHA-256 of the opaque token (64 hex), unique; `expires_at` after creation; `used_at` / `revoked_at` mark the single use and the revocation; FK `RESTRICT` to the user |
 | `idempotency_key` | The key each registration was created with (E-01, D-C35) | primary key `key_value` (8–128): registration is anonymous, so there is no owner; FK `RESTRICT` to the user |
 
